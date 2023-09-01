@@ -1,0 +1,9 @@
+[workspace]
+members = [
+	"paged",
+	"paged-derive"
+]
+
+[workspace.dependencies]
+paged-derive = { path = "paged-derive" }
+thiserror = "1.0.40"

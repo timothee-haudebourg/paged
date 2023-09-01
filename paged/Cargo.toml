@@ -1,0 +1,12 @@
+[package]
+name = "paged"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+paged-derive.workspace = true
+thiserror.workspace = true
+sharded-slab = "0.1.4"
+parking_lot = "0.12.1"

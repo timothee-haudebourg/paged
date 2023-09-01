@@ -1,0 +1,99 @@
+use std::io;
+
+use crate::heap::{self, Heap};
+
+pub trait Encode<C = ()> {
+	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32>;
+}
+
+pub trait EncodeOnHeap<C = ()>: EncodeSized {
+	fn encode_on_heap(
+		&self,
+		context: &C,
+		heap: &mut Heap,
+		output: &mut impl io::Write,
+	) -> io::Result<u32>;
+}
+
+pub trait EncodeSized {
+	const ENCODED_SIZE: u32;
+}
+
+macro_rules! encode_int {
+	($($ty:ty),*) => {
+		$(
+			impl<C> Encode<C> for $ty {
+				fn encode(&self, _context: &C, output: &mut impl io::Write) -> io::Result<u32> {
+					output.write_all(&self.to_be_bytes())?;
+					Ok(Self::ENCODED_SIZE)
+				}
+			}
+
+			impl<C> EncodeOnHeap<C> for $ty {
+				fn encode_on_heap(&self, _context: &C, _heap: &mut Heap, output: &mut impl io::Write) -> io::Result<u32> {
+					output.write_all(&self.to_be_bytes())?;
+					Ok(Self::ENCODED_SIZE)
+				}
+			}
+
+			impl EncodeSized for $ty {
+				const ENCODED_SIZE: u32 = std::mem::size_of::<$ty>() as u32;
+			}
+		)*
+	};
+}
+
+encode_int!(i8, i16, i32, i64, i128, u8, u16, u32, u64, u128);
+
+impl<C> Encode<C> for str {
+	fn encode(&self, _context: &C, output: &mut impl io::Write) -> io::Result<u32> {
+		output.write_all(self.as_bytes())?;
+		Ok(self.len() as u32)
+	}
+}
+
+impl<C> EncodeOnHeap<C> for String {
+	fn encode_on_heap(
+		&self,
+		context: &C,
+		heap: &mut Heap,
+		output: &mut impl io::Write,
+	) -> io::Result<u32> {
+		let entry = heap
+			.insert(context, self.as_str())?
+			.sized(self.len() as u32);
+		entry.encode(context, output)
+	}
+}
+
+impl EncodeSized for String {
+	const ENCODED_SIZE: u32 = heap::Entry::ENCODED_SIZE;
+}
+
+impl<C, T: Encode<C>> Encode<C> for [T] {
+	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32> {
+		let mut len = 0;
+		for t in self {
+			len += t.encode(context, output)?;
+		}
+		Ok(len)
+	}
+}
+
+impl<C, T: Encode<C>> EncodeOnHeap<C> for Vec<T> {
+	fn encode_on_heap(
+		&self,
+		context: &C,
+		heap: &mut Heap,
+		output: &mut impl io::Write,
+	) -> io::Result<u32> {
+		let entry = heap
+			.insert(context, self.as_slice())?
+			.sized(self.len() as u32);
+		entry.encode(context, output)
+	}
+}
+
+impl<T> EncodeSized for Vec<T> {
+	const ENCODED_SIZE: u32 = heap::Entry::ENCODED_SIZE;
+}
