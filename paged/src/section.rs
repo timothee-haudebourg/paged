@@ -1,11 +1,15 @@
 use std::{io, marker::PhantomData};
 
+use educe::Educe;
+
 use crate::{
 	encode::{Encode, EncodeSized},
 	utils::CeilingDiv,
 	Decode, DecodeFromHeap, EncodeOnHeap, Heap,
 };
 
+#[derive(Educe)]
+#[educe(Clone, Copy)]
 pub struct Section<T> {
 	page_offset: u32,
 	entry_count: u32,
@@ -13,6 +17,14 @@ pub struct Section<T> {
 }
 
 impl<T> Section<T> {
+	pub fn page_offset(&self) -> u32 {
+		self.page_offset
+	}
+
+	pub fn entry_count(&self) -> u32 {
+		self.entry_count
+	}
+
 	pub fn offset_of_page(&self, page_len: u32, i: u32) -> u32 {
 		(self.page_offset + i) * page_len
 	}
@@ -66,7 +78,7 @@ impl<C, T> DecodeFromHeap<C> for Section<T> {
 	fn decode_from_heap<R: io::Seek + io::Read>(
 		input: &mut crate::reader::Cursor<R>,
 		context: &mut C,
-		_heap: &crate::HeapSection,
+		_heap: crate::HeapSection,
 	) -> io::Result<Self> {
 		Self::decode(input, context)
 	}
@@ -74,7 +86,7 @@ impl<C, T> DecodeFromHeap<C> for Section<T> {
 
 impl<C, T> Decode<C> for Section<T> {
 	fn decode<R: io::Read>(
-		input: &mut crate::reader::Cursor<R>,
+		input: &mut R,
 		context: &mut C,
 	) -> io::Result<Self> {
 		Ok(Self {

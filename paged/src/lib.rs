@@ -1,5 +1,6 @@
 use std::io;
 
+#[cfg(feature = "derive")]
 pub use paged_derive::Paged;
 
 mod decode;
@@ -7,12 +8,19 @@ mod encode;
 pub mod heap;
 pub mod reader;
 pub mod section;
-mod utils;
+pub mod utils;
 
 pub use decode::*;
 pub use encode::*;
 pub use heap::{Heap, HeapSection};
 pub use section::Section;
+pub use reader::*;
+
+pub fn no_context_mut() -> &'static mut () {
+	unsafe {
+		std::mem::transmute(&mut ())
+	}
+}
 
 pub struct Encoder<W> {
 	output: W,

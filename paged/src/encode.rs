@@ -45,6 +45,17 @@ macro_rules! encode_int {
 
 encode_int!(i8, i16, i32, i64, i128, u8, u16, u32, u64, u128);
 
+pub fn encode_string_on_heap(
+	heap: &mut Heap,
+	output: &mut impl io::Write,
+	str: &str
+) -> io::Result<u32> {
+	let entry = heap
+		.insert(&(), str)?
+		.sized(str.len() as u32);
+	entry.encode(&(), output)
+}
+
 impl<C> Encode<C> for str {
 	fn encode(&self, _context: &C, output: &mut impl io::Write) -> io::Result<u32> {
 		output.write_all(self.as_bytes())?;
@@ -55,14 +66,11 @@ impl<C> Encode<C> for str {
 impl<C> EncodeOnHeap<C> for String {
 	fn encode_on_heap(
 		&self,
-		context: &C,
+		_context: &C,
 		heap: &mut Heap,
 		output: &mut impl io::Write,
 	) -> io::Result<u32> {
-		let entry = heap
-			.insert(context, self.as_str())?
-			.sized(self.len() as u32);
-		entry.encode(context, output)
+		encode_string_on_heap(heap, output, self.as_str())
 	}
 }
 
@@ -96,4 +104,29 @@ impl<C, T: Encode<C>> EncodeOnHeap<C> for Vec<T> {
 
 impl<T> EncodeSized for Vec<T> {
 	const ENCODED_SIZE: u32 = heap::Entry::ENCODED_SIZE;
+}
+
+impl<T1: EncodeSized, T2: EncodeSized> EncodeSized for (T1, T2) {
+	const ENCODED_SIZE: u32 = T1::ENCODED_SIZE + T2::ENCODED_SIZE;
+}
+
+impl<C, T1: Encode<C>, T2: Encode<C>> Encode<C> for (T1, T2) {
+	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32> {
+		let a = self.0.encode(context, output)?;
+		let b = self.1.encode(context, output)?;
+		Ok(a + b)
+	}
+}
+
+impl<C, T1: EncodeOnHeap<C>, T2: EncodeOnHeap<C>> EncodeOnHeap<C> for (T1, T2) {
+	fn encode_on_heap(
+		&self,
+		context: &C,
+		heap: &mut Heap,
+		output: &mut impl io::Write,
+	) -> io::Result<u32> {
+		let a = self.0.encode_on_heap(context, heap, output)?;
+		let b = self.0.encode_on_heap(context, heap, output)?;
+		Ok(a + b)
+	}
 }

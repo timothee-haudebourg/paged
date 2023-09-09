@@ -21,17 +21,20 @@ pub struct Dataset {
 }
 
 #[derive(Paged)]
+#[paged(heap)]
 pub struct Iri {
 	value: String,
 	id: u32,
 }
 
 #[derive(Paged)]
+#[paged(heap)]
 pub struct Literal {
 	value: String,
 }
 
 #[derive(Paged)]
+#[paged(heap)]
 pub struct InterpretedResource {
 	id: u32,
 	iris: Vec<u32>,
@@ -52,6 +55,7 @@ pub struct GraphDescription {
 }
 
 #[derive(Paged)]
+#[paged(heap)]
 pub struct GraphResource {
 	as_subject: Vec<u32>,
 	as_predicate: Vec<u32>,
@@ -59,10 +63,12 @@ pub struct GraphResource {
 }
 
 #[derive(Paged)]
-pub struct Triple {
-	subject: u32,
-	predicate: u32,
-	object: u32,
+pub struct Triple(u32, u32, u32);
+
+#[derive(Paged)]
+pub enum Cause {
+	Stated(u32),
+	Entailed(u32),
 }
 
 fn main() {

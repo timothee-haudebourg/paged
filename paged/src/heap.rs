@@ -75,7 +75,7 @@ impl EncodeSized for Offset {
 }
 
 impl<C> Decode<C> for Offset {
-	fn decode<R: io::Read>(input: &mut reader::Cursor<R>, context: &mut C) -> io::Result<Self> {
+	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
 		Ok(Self(u32::decode(input, context)?))
 	}
 }
@@ -99,7 +99,7 @@ impl EncodeSized for Entry {
 }
 
 impl<C> Decode<C> for Entry {
-	fn decode<R: io::Read>(input: &mut reader::Cursor<R>, context: &mut C) -> io::Result<Self> {
+	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
 		Ok(Self {
 			offset: Offset::decode(input, context)?,
 			len: u32::decode(input, context)?,
@@ -122,6 +122,7 @@ impl<'a> io::Write for Writer<'a> {
 	}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HeapSection {
 	pub page_offset: u32,
 	pub page_count: u32,
@@ -151,7 +152,7 @@ impl EncodeSized for HeapSection {
 }
 
 impl<C> Decode<C> for HeapSection {
-	fn decode<R: io::Read>(input: &mut reader::Cursor<R>, context: &mut C) -> io::Result<Self> {
+	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
 		Ok(Self {
 			page_offset: u32::decode(input, context)?,
 			page_count: u32::decode(input, context)?,
@@ -163,7 +164,7 @@ impl<C> DecodeFromHeap<C> for HeapSection {
 	fn decode_from_heap<R: io::Seek + io::Read>(
 		input: &mut reader::Cursor<R>,
 		context: &mut C,
-		_heap: &HeapSection,
+		_heap: HeapSection,
 	) -> io::Result<Self> {
 		Self::decode(input, context)
 	}

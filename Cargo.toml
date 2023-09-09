@@ -7,3 +7,4 @@ members = [
 [workspace.dependencies]
 paged-derive = { path = "paged-derive" }
 thiserror = "1.0.40"
+educe = "0.4.22"
