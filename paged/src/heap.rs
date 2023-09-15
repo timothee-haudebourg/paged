@@ -7,17 +7,22 @@ use crate::{
 	Decode, DecodeFromHeap, EncodeOnHeap,
 };
 
+#[derive(Default)]
 pub struct Heap {
 	data: Vec<u8>,
 }
 
 impl Heap {
 	pub fn new() -> Self {
-		Self { data: Vec::new() }
+		Self::default()
 	}
 
 	pub fn len(&self) -> u32 {
 		self.data.len() as u32
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.data.is_empty()
 	}
 
 	pub fn as_bytes(&self) -> &[u8] {

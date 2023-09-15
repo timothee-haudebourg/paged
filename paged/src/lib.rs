@@ -13,13 +13,11 @@ pub mod utils;
 pub use decode::*;
 pub use encode::*;
 pub use heap::{Heap, HeapSection};
-pub use section::Section;
 pub use reader::*;
+pub use section::Section;
 
 pub fn no_context_mut() -> &'static mut () {
-	unsafe {
-		std::mem::transmute(&mut ())
-	}
+	unsafe { std::mem::transmute(&mut ()) }
 }
 
 pub struct Encoder<W> {

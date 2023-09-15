@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{Encode, EncodeSized, Decode};
+use crate::{Decode, Encode, EncodeSized};
 
 pub trait CeilingDiv {
 	fn ceiling_div(self, other: Self) -> Self;
@@ -48,11 +48,11 @@ impl<C, T: Decode<C>> Decode<C> for Inline<Vec<T>> {
 	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
 		let len = u32::decode(input, context)?;
 		let mut result = Vec::with_capacity(len as usize);
-		
+
 		for _ in 0..len {
 			result.push(T::decode(input, context)?)
 		}
-		
+
 		Ok(Self(result))
 	}
 }

@@ -1,11 +1,13 @@
-use std::{io, cmp::Ordering};
+use std::{cmp::Ordering, io};
 
-use crate::{heap::Offset, Decode, DecodeFromHeap, EncodeSized, HeapSection, Section, no_context_mut};
+use crate::{
+	heap::Offset, no_context_mut, Decode, DecodeFromHeap, EncodeSized, HeapSection, Section,
+};
 
 pub mod cache;
 pub mod page;
 
-pub use cache::{Cache, Ref, EntryRef, UnboundRef, UnboundSliceIter};
+pub use cache::{Cache, EntryRef, Ref, UnboundRef, UnboundSliceIter};
 pub use page::Page;
 use parking_lot::Mutex;
 
@@ -112,16 +114,12 @@ pub struct Reader<R> {
 
 impl<R> Reader<R> {
 	/// Creates a new reader.
-	/// 
+	///
 	/// It is assumed that the current input position is `first_page_offset`.
-	pub fn new(
-		input: R,
-		page_len: u32,
-		first_page_offset: u32
-	) -> Self {
+	pub fn new(input: R, page_len: u32, first_page_offset: u32) -> Self {
 		let options = Options {
 			page_len,
-			first_page_offset
+			first_page_offset,
 		};
 
 		Self {
@@ -130,7 +128,7 @@ impl<R> Reader<R> {
 				current_offset: first_page_offset,
 				options,
 			}),
-			options
+			options,
 		}
 	}
 }
@@ -181,7 +179,7 @@ impl<R: io::Seek + io::Read> Reader<R> {
 		&'a self,
 		section: Section<T>,
 		cache: &'c Cache<T>,
-		heap: HeapSection
+		heap: HeapSection,
 	) -> Pages<'a, 'c, R, T> {
 		Pages::new(self, section, cache, heap)
 	}
@@ -190,11 +188,11 @@ impl<R: io::Seek + io::Read> Reader<R> {
 		&'a self,
 		section: Section<T>,
 		cache: &'c Cache<T>,
-		heap: HeapSection
+		heap: HeapSection,
 	) -> Iter<'a, 'c, R, T> {
 		Iter {
 			pages: self.pages(section, cache, heap),
-			current_page: None
+			current_page: None,
 		}
 	}
 
@@ -248,7 +246,7 @@ pub struct Pages<'a, 'c, R, T> {
 	cache: &'c Cache<T>,
 	heap: HeapSection,
 	page_count: u32,
-	page_index: u32
+	page_index: u32,
 }
 
 impl<'a, 'c, R, T: EncodeSized> Pages<'a, 'c, R, T> {
@@ -256,7 +254,7 @@ impl<'a, 'c, R, T: EncodeSized> Pages<'a, 'c, R, T> {
 		reader: &'a Reader<R>,
 		section: Section<T>,
 		cache: &'c Cache<T>,
-		heap: HeapSection
+		heap: HeapSection,
 	) -> Self {
 		let page_count = section.page_count(reader.options.page_len);
 
@@ -266,24 +264,30 @@ impl<'a, 'c, R, T: EncodeSized> Pages<'a, 'c, R, T> {
 			cache,
 			heap,
 			page_count,
-			page_index: 0
+			page_index: 0,
 		}
 	}
 }
 
-impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> ContextualIterator<C> for Pages<'a, 'c, R, T> {
+impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> ContextualIterator<C>
+	for Pages<'a, 'c, R, T>
+{
 	type Item = Result<Ref<'c, T>, Error>;
 
 	fn next_with(&mut self, context: &mut C) -> Option<Self::Item> {
 		if self.page_index < self.page_count {
-			match self.reader.get_page(self.section, self.cache, context, self.heap, self.page_index) {
+			match self.reader.get_page(
+				self.section,
+				self.cache,
+				context,
+				self.heap,
+				self.page_index,
+			) {
 				Ok(page) => {
 					self.page_index += 1;
 					Some(Ok(page))
 				}
-				Err(e) => {
-					Some(Err(e))
-				}
+				Err(e) => Some(Err(e)),
 			}
 		} else {
 			None
@@ -291,7 +295,9 @@ impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> Cont
 	}
 }
 
-impl<'a, 'c, R: io::Seek + io::Read, T: EncodeSized + DecodeFromHeap> Iterator for Pages<'a, 'c, R, T> {
+impl<'a, 'c, R: io::Seek + io::Read, T: EncodeSized + DecodeFromHeap> Iterator
+	for Pages<'a, 'c, R, T>
+{
 	type Item = Result<Ref<'c, T>, Error>;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -301,10 +307,12 @@ impl<'a, 'c, R: io::Seek + io::Read, T: EncodeSized + DecodeFromHeap> Iterator f
 
 pub struct Iter<'a, 'c, R, T> {
 	pages: Pages<'a, 'c, R, T>,
-	current_page: Option<Ref<'c, T, page::UnboundIter<T>>>
+	current_page: Option<Ref<'c, T, page::UnboundIter<T>>>,
 }
 
-impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> ContextualIterator<C> for Iter<'a, 'c, R, T> {
+impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> ContextualIterator<C>
+	for Iter<'a, 'c, R, T>
+{
 	type Item = Result<Ref<'c, T, UnboundRef<T>>, Error>;
 
 	fn next_with(&mut self, context: &mut C) -> Option<Self::Item> {
@@ -312,19 +320,21 @@ impl<'a, 'c, R: io::Seek + io::Read, C, T: EncodeSized + DecodeFromHeap<C>> Cont
 			match &mut self.current_page {
 				Some(page) => match page.next() {
 					Some(entry) => break Some(Ok(entry)),
-					None => self.current_page = None
-				}
+					None => self.current_page = None,
+				},
 				None => match self.pages.next_with(context) {
 					Some(Ok(page)) => self.current_page = Some(page.map(page::IterBinder::new())),
 					Some(Err(e)) => break Some(Err(e)),
-					None => break None
-				}
+					None => break None,
+				},
 			}
 		}
 	}
 }
 
-impl<'a, 'c, R: io::Seek + io::Read, T: EncodeSized + DecodeFromHeap> Iterator for Iter<'a, 'c, R, T> {
+impl<'a, 'c, R: io::Seek + io::Read, T: EncodeSized + DecodeFromHeap> Iterator
+	for Iter<'a, 'c, R, T>
+{
 	type Item = Result<Ref<'c, T, UnboundRef<T>>, Error>;
 
 	fn next(&mut self) -> Option<Self::Item> {

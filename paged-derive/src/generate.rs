@@ -1,17 +1,17 @@
-use proc_macro2::{TokenStream, TokenTree, Span, Ident};
+use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use syn::{punctuated::Punctuated, Token, spanned::Spanned};
+use syn::{punctuated::Punctuated, spanned::Spanned, Token};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error(transparent)]
-	Parse(#[from] syn::parse::Error)
+	Parse(#[from] syn::parse::Error),
 }
 
 impl Error {
 	pub fn span(&self) -> Span {
 		match self {
-			Self::Parse(e) => e.span()
+			Self::Parse(e) => e.span(),
 		}
 	}
 }
@@ -19,34 +19,38 @@ impl Error {
 fn extend_generics(
 	generics: &syn::Generics,
 	context: Option<&syn::TypeParam>,
-	additional_bounds: Vec<syn::WherePredicate>
+	additional_bounds: Vec<syn::WherePredicate>,
 ) -> syn::Generics {
 	let mut result = generics.clone();
 
 	if let Some(context) = context {
-		result
-		.params
-		.push(syn::GenericParam::Type(context.clone()));
+		result.params.push(syn::GenericParam::Type(context.clone()));
 	}
 
-	result.make_where_clause().predicates.extend(additional_bounds);
+	result
+		.make_where_clause()
+		.predicates
+		.extend(additional_bounds);
 
 	result
 }
 
 pub enum FieldIdentOrIndex<'a> {
 	Ident(&'a TokenStream, &'a Ident),
-	Index(&'a TokenStream, syn::Index)
+	Index(&'a TokenStream, syn::Index),
 }
 
 impl<'a> FieldIdentOrIndex<'a> {
 	pub fn new(prefix: &'a TokenStream, f: &'a syn::Field, i: usize) -> Self {
 		match &f.ident {
 			Some(ident) => Self::Ident(prefix, ident),
-			None => Self::Index(prefix, syn::Index {
-				index: i as u32,
-				span: f.span()
-			})
+			None => Self::Index(
+				prefix,
+				syn::Index {
+					index: i as u32,
+					span: f.span(),
+				},
+			),
 		}
 	}
 }
@@ -59,21 +63,21 @@ impl<'a> ToTokens for FieldIdentOrIndex<'a> {
 			}),
 			Self::Index(prefix, i) => tokens.extend(quote! {
 				#prefix #i
-			})
+			}),
 		}
 	}
 }
 
 pub enum FieldConstructor<'a> {
 	Ident(&'a Ident),
-	Index
+	Index,
 }
 
 impl<'a> FieldConstructor<'a> {
 	pub fn new(f: &'a syn::Field) -> Self {
 		match &f.ident {
 			Some(ident) => Self::Ident(ident),
-			None => Self::Index
+			None => Self::Index,
 		}
 	}
 }
@@ -81,12 +85,10 @@ impl<'a> FieldConstructor<'a> {
 impl<'a> ToTokens for FieldConstructor<'a> {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
 		match self {
-			Self::Ident(i) => {
-				tokens.extend(quote! {
-					#i :
-				})
-			},
-			Self::Index => ()
+			Self::Ident(i) => tokens.extend(quote! {
+				#i :
+			}),
+			Self::Index => (),
 		}
 	}
 }
@@ -104,16 +106,12 @@ impl<'a> ToTokens for DecodeFieldsFromHeap<'a> {
 
 		match self.0 {
 			syn::Fields::Unit => (),
-			syn::Fields::Named(_) => {
-				tokens.extend(quote! {
-					{ #(#args),* }
-				})
-			}
-			syn::Fields::Unnamed(_) => {
-				tokens.extend(quote! {
-					( #(#args),* )
-				})
-			}
+			syn::Fields::Named(_) => tokens.extend(quote! {
+				{ #(#args),* }
+			}),
+			syn::Fields::Unnamed(_) => tokens.extend(quote! {
+				( #(#args),* )
+			}),
 		}
 	}
 }
@@ -131,16 +129,12 @@ impl<'a> ToTokens for DecodeFields<'a> {
 
 		match self.0 {
 			syn::Fields::Unit => (),
-			syn::Fields::Named(_) => {
-				tokens.extend(quote! {
-					{ #(#args),* }
-				})
-			}
-			syn::Fields::Unnamed(_) => {
-				tokens.extend(quote! {
-					( #(#args),* )
-				})
-			}
+			syn::Fields::Named(_) => tokens.extend(quote! {
+				{ #(#args),* }
+			}),
+			syn::Fields::Unnamed(_) => tokens.extend(quote! {
+				( #(#args),* )
+			}),
 		}
 	}
 }
@@ -153,18 +147,15 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 	let context = match options.context {
 		Some(p) => {
 			context_ident = p.ident.clone();
-			let already_exists = input.generics.params.iter().any(|g| {
-				match g {
-					syn::GenericParam::Type(q) => {
-						q.ident == context_ident
-					}
-					_ => false
-				}
+			let already_exists = input.generics.params.iter().any(|g| match g {
+				syn::GenericParam::Type(q) => q.ident == context_ident,
+				_ => false,
 			});
 
 			if already_exists {
 				let bounds = p.bounds.clone();
-				let clause: syn::WherePredicate = syn::parse2(quote!(#context_ident: #bounds)).unwrap();
+				let clause: syn::WherePredicate =
+					syn::parse2(quote!(#context_ident: #bounds)).unwrap();
 				options.encode_sized_bounds.push(clause.clone());
 				options.encode_bounds.push(clause.clone());
 				options.decode_bounds.push(clause);
@@ -191,7 +182,8 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 	let encode_generics = extend_generics(&input.generics, context.as_ref(), options.encode_bounds);
 	let decode_generics = extend_generics(&input.generics, context.as_ref(), options.decode_bounds);
 
-	let (encode_sized_impl_generics, _, encode_sized_where_clause) = encode_sized_generics.split_for_impl();
+	let (encode_sized_impl_generics, _, encode_sized_where_clause) =
+		encode_sized_generics.split_for_impl();
 	let (encode_impl_generics, _, encode_where_clause) = encode_generics.split_for_impl();
 	let (decode_impl_generics, _, decode_where_clause) = decode_generics.split_for_impl();
 
@@ -211,7 +203,12 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 					}
 				});
 
-				let encode_fields_to_heap = encode_fields_to_heap(&s.fields, &context_ident, |f, i| FieldIdentOrIndex::new(&field_prefix, f, i), true);
+				let encode_fields_to_heap = encode_fields_to_heap(
+					&s.fields,
+					&context_ident,
+					|f, i| FieldIdentOrIndex::new(&field_prefix, f, i),
+					true,
+				);
 				let decode_constructor_from_heap = DecodeFieldsFromHeap(&s.fields, &context_ident);
 
 				tokens.extend(quote! {
@@ -236,7 +233,12 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 			}
 
 			if !options.requires_heap {
-				let encode_fields = encode_fields(&s.fields, &context_ident, |f, i| FieldIdentOrIndex::new(&field_prefix, f, i), true);
+				let encode_fields = encode_fields(
+					&s.fields,
+					&context_ident,
+					|f, i| FieldIdentOrIndex::new(&field_prefix, f, i),
+					true,
+				);
 				let decode_constructor = DecodeFields(&s.fields, &context_ident);
 
 				tokens.extend(quote! {
@@ -260,7 +262,7 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 			}
 
 			Ok(tokens)
-		},
+		}
 		syn::Data::Enum(e) => {
 			let mut encoded_size = quote!(0u32);
 
@@ -278,7 +280,8 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 			let encode_cases = e.variants.iter().enumerate().map(|(i, v)| {
 				let variant_ident = &v.ident;
 				let inputs = VariantInputs(&v.fields);
-				let encode_variant = encode_fields_to_heap(&v.fields, &context_ident, |f, i| VariantInput(f, i), false);
+				let encode_variant =
+					encode_fields_to_heap(&v.fields, &context_ident, VariantInput, false);
 				let discriminant = i as u8;
 				quote!(Self::#variant_ident #inputs => {
 					<u8 as ::paged::Encode<#context_ident>>::encode(&#discriminant, context, output)?;
@@ -291,7 +294,8 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 				let discriminant = i as u8;
 				let decode_variant = DecodeFieldsFromHeap(&v.fields, &context_ident);
 				let variant_size = fields_size(&v.fields);
-				let padding = quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - (#variant_size));
+				let padding =
+					quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - (#variant_size));
 				quote!(#discriminant => {
 					let result = Self::#variant_ident #decode_variant ;
 					input.pad(#padding)?;
@@ -324,12 +328,13 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 					}
 				}
 			});
-			
+
 			if !options.requires_heap {
 				let encode_cases = e.variants.iter().enumerate().map(|(i, v)| {
 					let variant_ident = &v.ident;
 					let inputs = VariantInputs(&v.fields);
-					let encode_variant = encode_fields(&v.fields, &context_ident, |f, i| VariantInput(f, i), false);
+					let encode_variant =
+						encode_fields(&v.fields, &context_ident, VariantInput, false);
 					let discriminant = i as u8;
 					quote!(Self::#variant_ident #inputs => {
 						<u8 as ::paged::Encode<#context_ident>>::encode(&#discriminant, context, output)?;
@@ -342,11 +347,12 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 					let discriminant = i as u8;
 					let decode_variant = DecodeFields(&v.fields, &context_ident);
 					let variant_size = fields_size(&v.fields);
-					let padding = quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - (#variant_size));
+					let padding =
+						quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - (#variant_size));
 					quote!(#discriminant => {
 						let result = Self::#variant_ident #decode_variant ;
 						let mut padding = [0; (#padding) as usize];
-						input.read(&mut padding)?;
+						input.read_exact(&mut padding)?;
 						Ok(result)
 					})
 				});
@@ -357,7 +363,6 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 							match self {
 								#(#encode_cases),*
 							}
-	
 							Ok(<Self as ::paged::EncodeSized>::ENCODED_SIZE)
 						}
 					}
@@ -400,7 +405,7 @@ fn encode_fields<'a, T: ToTokens>(
 	fields: &'a syn::Fields,
 	context_ident: &Ident,
 	accessor: impl Fn(&'a syn::Field, usize) -> T,
-	capture_len: bool
+	capture_len: bool,
 ) -> TokenStream {
 	let mut result = TokenStream::new();
 
@@ -410,7 +415,9 @@ fn encode_fields<'a, T: ToTokens>(
 		if capture_len {
 			result.extend(quote!(len += ));
 		}
-		result.extend(quote!(<#ty as ::paged::Encode<#context_ident>>::encode(#accessor, context, output)?;))
+		result.extend(
+			quote!(<#ty as ::paged::Encode<#context_ident>>::encode(#accessor, context, output)?;),
+		)
 	}
 
 	result
@@ -420,7 +427,7 @@ fn encode_fields_to_heap<'a, T: ToTokens>(
 	fields: &'a syn::Fields,
 	context_ident: &Ident,
 	accessor: impl Fn(&'a syn::Field, usize) -> T,
-	capture_len: bool
+	capture_len: bool,
 ) -> TokenStream {
 	let mut result = TokenStream::new();
 
@@ -460,7 +467,7 @@ impl<'a> ToTokens for VariantInput<'a> {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
 		match &self.0.ident {
 			Some(ident) => ident.to_tokens(tokens),
-			None => format_ident!("_arg{}", self.1).to_tokens(tokens)
+			None => format_ident!("_arg{}", self.1).to_tokens(tokens),
 		}
 	}
 }
@@ -472,24 +479,24 @@ pub struct Options {
 	encode_bounds: Vec<syn::WherePredicate>,
 	encode_sized_bounds: Vec<syn::WherePredicate>,
 	decode_bounds: Vec<syn::WherePredicate>,
-	context: Option<syn::TypeParam>
+	context: Option<syn::TypeParam>,
 }
 
 pub struct BoundsAttribute {
-	list: Punctuated<syn::WherePredicate, Token!(,)>
+	list: Punctuated<syn::WherePredicate, Token!(,)>,
 }
 
 impl syn::parse::Parse for BoundsAttribute {
 	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 		Ok(Self {
-			list: Punctuated::parse_terminated(input)?
+			list: Punctuated::parse_terminated(input)?,
 		})
 	}
 }
 
 fn parse_attributes(attributes: Vec<syn::Attribute>) -> Result<Options, Error> {
 	let mut options = Options::default();
-	
+
 	for attr in attributes {
 		if attr.path().is_ident("paged") {
 			match attr.meta {
@@ -505,40 +512,48 @@ fn parse_attributes(attributes: Vec<syn::Attribute>) -> Result<Options, Error> {
 								} else if id == "bounds" {
 									match tokens.next() {
 										Some(TokenTree::Group(group)) => {
-											let bounds: BoundsAttribute = syn::parse2(group.stream())?;
-											options.encode_bounds.extend(bounds.list.iter().cloned());
-											options.encode_sized_bounds.extend(bounds.list.iter().cloned());
+											let bounds: BoundsAttribute =
+												syn::parse2(group.stream())?;
+											options
+												.encode_bounds
+												.extend(bounds.list.iter().cloned());
+											options
+												.encode_sized_bounds
+												.extend(bounds.list.iter().cloned());
 											options.decode_bounds.extend(bounds.list);
 										}
 										Some(_) => panic!("unexpected token"),
-										None => panic!("missing bounds")
+										None => panic!("missing bounds"),
 									}
 								} else if id == "decode_bounds" {
 									match tokens.next() {
 										Some(TokenTree::Group(group)) => {
-											let bounds: BoundsAttribute = syn::parse2(group.stream())?;
+											let bounds: BoundsAttribute =
+												syn::parse2(group.stream())?;
 											options.decode_bounds.extend(bounds.list);
 										}
 										Some(_) => panic!("unexpected token"),
-										None => panic!("missing bounds")
+										None => panic!("missing bounds"),
 									}
 								} else if id == "encode_sized_bounds" {
 									match tokens.next() {
 										Some(TokenTree::Group(group)) => {
-											let bounds: BoundsAttribute = syn::parse2(group.stream())?;
+											let bounds: BoundsAttribute =
+												syn::parse2(group.stream())?;
 											options.encode_sized_bounds.extend(bounds.list);
 										}
 										Some(_) => panic!("unexpected token"),
-										None => panic!("missing bounds")
+										None => panic!("missing bounds"),
 									}
 								} else if id == "encode_bounds" {
 									match tokens.next() {
 										Some(TokenTree::Group(group)) => {
-											let bounds: BoundsAttribute = syn::parse2(group.stream())?;
+											let bounds: BoundsAttribute =
+												syn::parse2(group.stream())?;
 											options.encode_bounds.extend(bounds.list);
 										}
 										Some(_) => panic!("unexpected token"),
-										None => panic!("missing bounds")
+										None => panic!("missing bounds"),
 									}
 								} else if id == "context" {
 									match tokens.next() {
@@ -546,24 +561,24 @@ fn parse_attributes(attributes: Vec<syn::Attribute>) -> Result<Options, Error> {
 											options.context = Some(syn::parse2(group.stream())?);
 										}
 										Some(_) => panic!("unexpected token"),
-										None => panic!("missing bounds")
+										None => panic!("missing bounds"),
 									}
 								} else {
 									panic!("unknown `paged` attribute")
 								}
 							}
 							Some(_) => panic!("unexpected token"),
-							None => panic!("missing `paged` attribute name")
+							None => panic!("missing `paged` attribute name"),
 						}
 
 						match tokens.next() {
 							Some(TokenTree::Punct(p)) if p.as_char() == ',' => (),
 							Some(_) => panic!("unexpected token"),
-							None => break
+							None => break,
 						}
 					}
 				}
-				_ => panic!("invalid attribute")
+				_ => panic!("invalid attribute"),
 			}
 		}
 	}

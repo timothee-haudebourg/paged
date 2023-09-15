@@ -66,7 +66,7 @@ impl<C, T> EncodeOnHeap<C> for Section<T> {
 		_heap: &mut Heap,
 		output: &mut impl io::Write,
 	) -> io::Result<u32> {
-		Self::encode(&self, context, output)
+		Self::encode(self, context, output)
 	}
 }
 
@@ -85,10 +85,7 @@ impl<C, T> DecodeFromHeap<C> for Section<T> {
 }
 
 impl<C, T> Decode<C> for Section<T> {
-	fn decode<R: io::Read>(
-		input: &mut R,
-		context: &mut C,
-	) -> io::Result<Self> {
+	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
 		Ok(Self {
 			page_offset: u32::decode(input, context)?,
 			entry_count: u32::decode(input, context)?,

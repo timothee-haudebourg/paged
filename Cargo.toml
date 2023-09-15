@@ -3,6 +3,7 @@ members = [
 	"paged",
 	"paged-derive"
 ]
+resolver = "2"
 
 [workspace.dependencies]
 paged-derive = { path = "paged-derive" }

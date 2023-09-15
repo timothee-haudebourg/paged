@@ -48,11 +48,9 @@ encode_int!(i8, i16, i32, i64, i128, u8, u16, u32, u64, u128);
 pub fn encode_string_on_heap(
 	heap: &mut Heap,
 	output: &mut impl io::Write,
-	str: &str
+	str: &str,
 ) -> io::Result<u32> {
-	let entry = heap
-		.insert(&(), str)?
-		.sized(str.len() as u32);
+	let entry = heap.insert(&(), str)?.sized(str.len() as u32);
 	entry.encode(&(), output)
 }
 

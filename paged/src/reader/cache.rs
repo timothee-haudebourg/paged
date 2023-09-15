@@ -2,7 +2,7 @@ use educe::Educe;
 use parking_lot::RwLock;
 use sharded_slab::{pool, Pool};
 use std::marker::PhantomData;
-use std::{collections::HashMap, sync::Arc, ops::Deref};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use crate::ContextualIterator;
 
@@ -61,23 +61,42 @@ impl<T> Cache<T> {
 }
 
 pub trait Unbound {
-	type Bound<'a> where Self: 'a;
+	type Bound<'a>
+	where
+		Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b> where Self: 'a + 'b;
+	/// Transmutes the lifetime parameter of the given bound value.
+	///
+	/// # Safety
+	///
+	/// The caller must ensure the value lives for `'a` and `'b`.
+	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b>
+	where
+		Self: 'a + 'b;
 }
 
 pub trait UnboundIterator {
 	type UnboundItem: Unbound;
 
-	type Bound<'a>: 'a + Iterator<Item = <Self::UnboundItem as Unbound>::Bound<'a>> where Self: 'a;
+	type Bound<'a>: 'a + Iterator<Item = <Self::UnboundItem as Unbound>::Bound<'a>>
+	where
+		Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b>;
+	/// Transmutes the lifetime parameter of the given bound value.
+	///
+	/// # Safety
+	///
+	/// The caller must ensure the value lives for `'_` and `'b`.
+	unsafe fn transmute_lifetime<'b>(value: Self::Bound<'_>) -> Self::Bound<'b>;
 }
 
 impl<T: UnboundIterator> Unbound for T {
 	type Bound<'a> = <T as UnboundIterator>::Bound<'a> where Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b> where Self: 'a + 'b {
+	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b>
+	where
+		Self: 'a + 'b,
+	{
 		<T as UnboundIterator>::transmute_lifetime(value)
 	}
 }
@@ -95,7 +114,10 @@ pub struct UnboundRef<T>(PhantomData<T>);
 impl<T> Unbound for UnboundRef<T> {
 	type Bound<'a> = &'a T where Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b> where Self: 'a + 'b {
+	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b>
+	where
+		Self: 'a + 'b,
+	{
 		std::mem::transmute(value)
 	}
 }
@@ -105,20 +127,28 @@ pub struct UnboundOwned<T>(PhantomData<T>);
 impl<T> Unbound for UnboundOwned<T> {
 	type Bound<'a> = T where Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b> where Self: 'a + 'b {
+	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b>
+	where
+		Self: 'a + 'b,
+	{
 		value
 	}
 }
 
 pub trait Binder<'a, T: Unbound, U: Unbound> {
-	fn bind<'t>(self, t: T::Bound<'t>) -> U::Bound<'t> where 'a: 't;
+	fn bind<'t>(self, t: T::Bound<'t>) -> U::Bound<'t>
+	where
+		'a: 't;
 }
 
 impl<'a, T, U: Unbound, F> Binder<'a, UnboundRef<T>, U> for F
 where
-	F: for<'b> FnOnce(&'b T) -> U::Bound<'b>
+	F: for<'b> FnOnce(&'b T) -> U::Bound<'b>,
 {
-	fn bind<'t>(self, t: &'t T) -> U::Bound<'t> where 'a: 't {
+	fn bind<'t>(self, t: &'t T) -> U::Bound<'t>
+	where
+		'a: 't,
+	{
 		(self)(t)
 	}
 }
@@ -126,7 +156,10 @@ where
 pub struct IdentityBinder;
 
 impl<'a, T: Unbound> Binder<'a, T, T> for IdentityBinder {
-	fn bind<'t>(self, t: T::Bound<'t>) -> T::Bound<'t> where 'a: 't {
+	fn bind<'t>(self, t: T::Bound<'t>) -> T::Bound<'t>
+	where
+		'a: 't,
+	{
 		t
 	}
 }
@@ -138,7 +171,7 @@ impl<T> UnboundIterator for UnboundSliceIter<T> {
 
 	type Bound<'a> = std::slice::Iter<'a, T> where Self: 'a;
 
-	unsafe fn transmute_lifetime<'a, 'b>(value: Self::Bound<'a>) -> Self::Bound<'b> {
+	unsafe fn transmute_lifetime<'b>(value: Self::Bound<'_>) -> Self::Bound<'b> {
 		std::mem::transmute(value)
 	}
 }
@@ -160,29 +193,39 @@ impl<'a, T> Ref<'a, T> {
 }
 
 impl<'a, T, U: Unbound> Ref<'a, T, U> {
-	fn new_projection(page: pool::Ref<'a, Page<T>>, binder: impl Binder<'a, UnboundRef<Page<T>>, U>) -> Self {
+	fn new_projection(
+		page: pool::Ref<'a, Page<T>>,
+		binder: impl Binder<'a, UnboundRef<Page<T>>, U>,
+	) -> Self {
 		let u: U::Bound<'a> = unsafe { U::transmute_lifetime(binder.bind(&page)) };
-		Self { t: Arc::new(page), u }
+		Self {
+			t: Arc::new(page),
+			u,
+		}
 	}
 
 	pub fn map<V: Unbound>(self, binder: impl Binder<'a, U, V>) -> Ref<'a, T, V> {
 		Ref {
 			t: self.t,
-			u: binder.bind(self.u)
+			u: binder.bind(self.u),
 		}
 	}
 
-	pub fn unwrap(self) -> U::Bound<'static> where for<'t> U::Bound<'t>: 'static {
-		unsafe {
-			U::transmute_lifetime(self.u)
-		}
+	pub fn unwrap(self) -> U::Bound<'static>
+	where
+		for<'t> U::Bound<'t>: 'static,
+	{
+		unsafe { U::transmute_lifetime(self.u) }
 	}
 }
 
 pub struct CloneBinder;
 
 impl<'a, T: Clone> Binder<'a, UnboundRef<T>, UnboundOwned<T>> for CloneBinder {
-	fn bind<'t>(self, t: &'t T) -> T where 'a: 't {
+	fn bind<'t>(self, t: &'t T) -> T
+	where
+		'a: 't,
+	{
 		t.clone()
 	}
 }
@@ -190,7 +233,10 @@ impl<'a, T: Clone> Binder<'a, UnboundRef<T>, UnboundOwned<T>> for CloneBinder {
 pub struct CopyBinder;
 
 impl<'a, T: Copy> Binder<'a, UnboundRef<T>, UnboundOwned<T>> for CopyBinder {
-	fn bind<'t>(self, t: &'t T) -> T where 'a: 't {
+	fn bind<'t>(self, t: &'t T) -> T
+	where
+		'a: 't,
+	{
 		*t
 	}
 }
@@ -211,7 +257,7 @@ impl<'a, T, U> Deref for Ref<'a, T, UnboundRef<U>> {
 	type Target = U;
 
 	fn deref(&self) -> &Self::Target {
-		&self.u
+		self.u
 	}
 }
 
@@ -219,27 +265,23 @@ impl<'a, T, U: UnboundIterator> Iterator for Ref<'a, T, U> {
 	type Item = Ref<'a, T, U::UnboundItem>;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		self.u.next().map(|item| {
-			Ref {
-				t: self.t.clone(),
-				u: item
-			}
+		self.u.next().map(|item| Ref {
+			t: self.t.clone(),
+			u: item,
 		})
 	}
 }
 
 impl<'a, C: 'a, T, U: UnboundContextualIterator<C>> ContextualIterator<C> for Ref<'a, T, U>
 where
-	<U as Unbound>::Bound<'a>: ContextualIterator<C, Item = <U::UnboundItem as Unbound>::Bound<'a>>
+	<U as Unbound>::Bound<'a>: ContextualIterator<C, Item = <U::UnboundItem as Unbound>::Bound<'a>>,
 {
 	type Item = Ref<'a, T, U::UnboundItem>;
 
 	fn next_with(&mut self, context: &mut C) -> Option<Self::Item> {
-		self.u.next_with(context).map(|item| {
-			Ref {
-				t: self.t.clone(),
-				u: item
-			}
+		self.u.next_with(context).map(|item| Ref {
+			t: self.t.clone(),
+			u: item,
 		})
 	}
 }

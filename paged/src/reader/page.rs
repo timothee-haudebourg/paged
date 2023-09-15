@@ -59,25 +59,34 @@ pub type UnboundIter<T> = UnboundSliceIter<T>;
 
 pub struct GetEntryBinder<T> {
 	index: u32,
-	t: PhantomData<T>
+	t: PhantomData<T>,
 }
 
 impl<T> GetEntryBinder<T> {
 	pub fn new(index: u32) -> Self {
 		Self {
 			index,
-			t: PhantomData
+			t: PhantomData,
 		}
 	}
 }
 
 impl<'a, T> Binder<'a, UnboundRef<Page<T>>, UnboundRef<T>> for GetEntryBinder<T> {
-	fn bind<'t>(self, page: &'t Page<T>) -> &'t T where 'a: 't {
+	fn bind<'t>(self, page: &'t Page<T>) -> &'t T
+	where
+		'a: 't,
+	{
 		page.get(self.index).unwrap()
 	}
 }
 
 pub struct IterBinder<T>(PhantomData<T>);
+
+impl<T> Default for IterBinder<T> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 
 impl<T> IterBinder<T> {
 	pub fn new() -> Self {
@@ -86,7 +95,10 @@ impl<T> IterBinder<T> {
 }
 
 impl<'a, T> Binder<'a, UnboundRef<Page<T>>, UnboundIter<T>> for IterBinder<T> {
-	fn bind<'t>(self, page: &'t Page<T>) -> Iter<'t, T> where 'a: 't {
+	fn bind<'t>(self, page: &'t Page<T>) -> Iter<'t, T>
+	where
+		'a: 't,
+	{
 		page.iter()
 	}
 }
