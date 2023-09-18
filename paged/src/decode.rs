@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{heap, reader, HeapSection};
+use crate::{heap, reader, HeapSection, EncodeSized};
 
 pub trait Decode<C>: Sized {
 	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self>;
@@ -54,6 +54,51 @@ impl<C> DecodeFromHeap<C> for String {
 		bytes.resize(entry.len as usize, 0u8);
 		input.read_from_heap(heap, entry.offset, bytes.as_mut_slice())?;
 		String::from_utf8(bytes).map_err(|_| io::ErrorKind::InvalidData.into())
+	}
+}
+
+fn pad(input: &mut impl io::Read, len: u32) -> io::Result<()> {
+	let mut buffer = [0u8; 1];
+	for _ in 0..len {
+		input.read_exact(&mut buffer)?;
+	}
+
+	Ok(())
+}
+
+impl<C, T: EncodeSized + Decode<C>> Decode<C> for Option<T> {
+	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self> {
+		let discriminant = u8::decode(input, context)?;
+		match discriminant {
+			0 => {
+				pad(input, T::ENCODED_SIZE)?;
+				Ok(None)
+			}
+			1 => {
+				T::decode(input, context).map(Some)
+			},
+			_ => Err(io::ErrorKind::InvalidData.into())
+		}
+	}
+}
+
+impl<C, T: EncodeSized + DecodeFromHeap<C>> DecodeFromHeap<C> for Option<T> {
+	fn decode_from_heap<R: io::Seek + io::Read>(
+		input: &mut reader::Cursor<R>,
+		context: &mut C,
+		heap: HeapSection,
+	) -> io::Result<Self> {
+		let discriminant = u8::decode(input, context)?;
+		match discriminant {
+			0 => {
+				input.pad(T::ENCODED_SIZE)?;
+				Ok(None)
+			}
+			1 => {
+				T::decode_from_heap(input, context, heap).map(Some)
+			},
+			_ => Err(io::ErrorKind::InvalidData.into())
+		}
 	}
 }
 

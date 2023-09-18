@@ -1,4 +1,5 @@
 use std::io;
+use std::ops::Deref;
 
 #[cfg(feature = "derive")]
 pub use paged_derive::Paged;
@@ -37,6 +38,49 @@ impl<W> Encoder<W> {
 
 	pub fn begin_section<'h, T>(&mut self, heap: &'h mut Heap) -> section::Encoder<'_, 'h, W, T> {
 		section::Encoder::new(self, heap, self.page_count)
+	}
+
+	pub fn end(self) -> W {
+		self.output
+	}
+
+	pub fn section_from_iter<I: IntoIterator>(
+		&mut self,
+		heap: &mut Heap,
+		items: I
+	) -> io::Result<Section<<I::Item as Deref>::Target>>
+	where
+		I::Item: Deref,
+		<I::Item as Deref>::Target: Sized + EncodeOnHeap,
+		W: io::Write + io::Seek
+	{
+		let mut encoder = self.begin_section(heap);
+		
+		for item in items {
+			encoder.push(&(), &*item)?
+		}
+		
+		Ok(encoder.end())
+	}
+
+	pub fn section_from_iter_with<I: IntoIterator, C>(
+		&mut self,
+		heap: &mut Heap,
+		context: &C,
+		items: I
+	) -> io::Result<Section<<I::Item as Deref>::Target>>
+	where
+		I::Item: Deref,
+		<I::Item as Deref>::Target: Sized + EncodeOnHeap<C>,
+		W: io::Write + io::Seek
+	{
+		let mut encoder = self.begin_section(heap);
+		
+		for item in items {
+			encoder.push(context, &*item)?
+		}
+		
+		Ok(encoder.end())
 	}
 }
 

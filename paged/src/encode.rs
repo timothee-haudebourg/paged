@@ -76,6 +76,48 @@ impl EncodeSized for String {
 	const ENCODED_SIZE: u32 = heap::Entry::ENCODED_SIZE;
 }
 
+fn pad(output: &mut impl io::Write, len: u32) -> io::Result<u32> {
+	for _ in 0..len {
+		0u8.encode(&(), output)?;
+	}
+	Ok(len)
+}
+
+impl<T: EncodeSized> EncodeSized for Option<T> {
+	const ENCODED_SIZE: u32 = 1 + T::ENCODED_SIZE;
+}
+
+impl<C, T: EncodeSized + Encode<C>> Encode<C> for Option<T> {
+	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32> {
+		match self {
+			Self::None => {
+				Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?)
+			}
+			Self::Some(t) => {
+				Ok(1u8.encode(context, output)? + t.encode(context, output)?)
+			}
+		}
+	}
+}
+
+impl<C, T: EncodeOnHeap<C>> EncodeOnHeap<C> for Option<T> {
+	fn encode_on_heap(
+		&self,
+		context: &C,
+		heap: &mut Heap,
+		output: &mut impl io::Write,
+	) -> io::Result<u32> {
+		match self {
+			Self::None => {
+				Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?)
+			}
+			Self::Some(t) => {
+				Ok(1u8.encode(context, output)? + t.encode_on_heap(context, heap, output)?)
+			}
+		}
+	}
+}
+
 impl<C, T: Encode<C>> Encode<C> for [T] {
 	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32> {
 		let mut len = 0;
