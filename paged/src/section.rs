@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Educe)]
-#[educe(Clone, Copy)]
+#[educe(Debug, Clone, Copy)]
 pub struct Section<T> {
 	page_offset: u32,
 	entry_count: u32,
@@ -135,16 +135,6 @@ impl<'a, 'h, W, T> Encoder<'a, 'h, W, T> {
 	}
 }
 
-impl<'a, 'h, W, T: EncodeSized> Encoder<'a, 'h, W, T> {
-	pub fn end(self) -> Section<T> {
-		Section {
-			page_offset: self.page_offset,
-			entry_count: self.entry_count,
-			t: PhantomData,
-		}
-	}
-}
-
 impl<'a, 'h, W: io::Write + io::Seek, T> Encoder<'a, 'h, W, T> {
 	pub fn push<C>(&mut self, context: &C, value: &T) -> io::Result<()>
 	where
@@ -168,5 +158,14 @@ impl<'a, 'h, W: io::Write + io::Seek, T> Encoder<'a, 'h, W, T> {
 		}
 
 		Ok(())
+	}
+
+	pub fn end(self) -> io::Result<Section<T>> {
+		self.encoder.pad(self.padding())?;
+		Ok(Section {
+			page_offset: self.page_offset,
+			entry_count: self.entry_count,
+			t: PhantomData,
+		})
 	}
 }

@@ -90,12 +90,8 @@ impl<T: EncodeSized> EncodeSized for Option<T> {
 impl<C, T: EncodeSized + Encode<C>> Encode<C> for Option<T> {
 	fn encode(&self, context: &C, output: &mut impl io::Write) -> io::Result<u32> {
 		match self {
-			Self::None => {
-				Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?)
-			}
-			Self::Some(t) => {
-				Ok(1u8.encode(context, output)? + t.encode(context, output)?)
-			}
+			Self::None => Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?),
+			Self::Some(t) => Ok(1u8.encode(context, output)? + t.encode(context, output)?),
 		}
 	}
 }
@@ -108,9 +104,7 @@ impl<C, T: EncodeOnHeap<C>> EncodeOnHeap<C> for Option<T> {
 		output: &mut impl io::Write,
 	) -> io::Result<u32> {
 		match self {
-			Self::None => {
-				Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?)
-			}
+			Self::None => Ok(0u8.encode(context, output)? + pad(output, T::ENCODED_SIZE)?),
 			Self::Some(t) => {
 				Ok(1u8.encode(context, output)? + t.encode_on_heap(context, heap, output)?)
 			}

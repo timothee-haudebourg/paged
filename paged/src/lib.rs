@@ -47,40 +47,40 @@ impl<W> Encoder<W> {
 	pub fn section_from_iter<I: IntoIterator>(
 		&mut self,
 		heap: &mut Heap,
-		items: I
+		items: I,
 	) -> io::Result<Section<<I::Item as Deref>::Target>>
 	where
 		I::Item: Deref,
 		<I::Item as Deref>::Target: Sized + EncodeOnHeap,
-		W: io::Write + io::Seek
+		W: io::Write + io::Seek,
 	{
 		let mut encoder = self.begin_section(heap);
-		
+
 		for item in items {
 			encoder.push(&(), &*item)?
 		}
-		
-		Ok(encoder.end())
+
+		encoder.end()
 	}
 
 	pub fn section_from_iter_with<I: IntoIterator, C>(
 		&mut self,
 		heap: &mut Heap,
 		context: &C,
-		items: I
+		items: I,
 	) -> io::Result<Section<<I::Item as Deref>::Target>>
 	where
 		I::Item: Deref,
 		<I::Item as Deref>::Target: Sized + EncodeOnHeap<C>,
-		W: io::Write + io::Seek
+		W: io::Write + io::Seek,
 	{
 		let mut encoder = self.begin_section(heap);
-		
+
 		for item in items {
 			encoder.push(context, &*item)?
 		}
-		
-		Ok(encoder.end())
+
+		encoder.end()
 	}
 }
 

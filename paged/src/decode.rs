@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{heap, reader, HeapSection, EncodeSized};
+use crate::{heap, reader, EncodeSized, HeapSection};
 
 pub trait Decode<C>: Sized {
 	fn decode<R: io::Read>(input: &mut R, context: &mut C) -> io::Result<Self>;
@@ -74,10 +74,8 @@ impl<C, T: EncodeSized + Decode<C>> Decode<C> for Option<T> {
 				pad(input, T::ENCODED_SIZE)?;
 				Ok(None)
 			}
-			1 => {
-				T::decode(input, context).map(Some)
-			},
-			_ => Err(io::ErrorKind::InvalidData.into())
+			1 => T::decode(input, context).map(Some),
+			_ => Err(io::ErrorKind::InvalidData.into()),
 		}
 	}
 }
@@ -94,10 +92,8 @@ impl<C, T: EncodeSized + DecodeFromHeap<C>> DecodeFromHeap<C> for Option<T> {
 				input.pad(T::ENCODED_SIZE)?;
 				Ok(None)
 			}
-			1 => {
-				T::decode_from_heap(input, context, heap).map(Some)
-			},
-			_ => Err(io::ErrorKind::InvalidData.into())
+			1 => T::decode_from_heap(input, context, heap).map(Some),
+			_ => Err(io::ErrorKind::InvalidData.into()),
 		}
 	}
 }
