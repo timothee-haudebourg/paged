@@ -1,9 +1,15 @@
 [package]
 name = "paged"
-version = "0.1.0"
-edition = "2021"
+description = "Read and create read-only paged database files"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+categories.workspace = true
+keywords.workspace = true
+repository.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/paged"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 derive = ["paged-derive"]
 
