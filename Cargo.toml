@@ -16,6 +16,6 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 
 [workspace.dependencies]
-paged-derive = { path = "paged-derive" }
+paged-derive = { path = "paged-derive", version = "0.1.0" }
 thiserror = "1.0.40"
 educe = "0.4.22"
