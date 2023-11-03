@@ -46,7 +46,7 @@ impl<R: io::Seek> Cursor<R> {
 	pub fn pad(&mut self, padding: u32) -> io::Result<()> {
 		self.input.seek(io::SeekFrom::Current(padding as i64))?;
 		self.current_offset += padding;
-				Ok(())
+		Ok(())
 	}
 }
 
@@ -103,7 +103,7 @@ impl<R: io::Read> Cursor<R> {
 impl<R: io::Read> io::Read for Cursor<R> {
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		let len = self.input.read(buf)?;
-				self.current_offset += len as u32;
+		self.current_offset += len as u32;
 		Ok(len)
 	}
 }
@@ -151,8 +151,8 @@ impl<R: io::Seek + io::Read> Reader<R> {
 
 			let mut cursor = self.cursor.lock();
 			cursor.seek(offset)?;
-						for _ in 0..entry_count {
-								page.push(T::decode_from_heap(&mut cursor, context, heap)?)
+			for _ in 0..entry_count {
+				page.push(T::decode_from_heap(&mut cursor, context, heap)?)
 			}
 
 			Ok(())
