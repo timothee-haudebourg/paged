@@ -6,7 +6,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Timothée Haudebourg <timothee@haudebourg.net>"]
 categories = ["data-structures"]
@@ -16,6 +16,6 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 
 [workspace.dependencies]
-paged-derive = { path = "paged-derive", version = "0.1.0" }
+paged-derive = { path = "paged-derive", version = "0.1.1" }
 thiserror = "1.0.40"
 educe = "0.4.22"
