@@ -295,7 +295,7 @@ pub fn paged(input: syn::DeriveInput) -> Result<TokenStream, Error> {
 				let decode_variant = DecodeFieldsFromHeap(&v.fields, &context_ident);
 				let variant_size = fields_size(&v.fields);
 				let padding =
-					quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - (#variant_size));
+					quote!(<Self as ::paged::EncodeSized>::ENCODED_SIZE - 1 - (#variant_size));
 				quote!(#discriminant => {
 					let result = Self::#variant_ident #decode_variant ;
 					input.pad(#padding)?;
